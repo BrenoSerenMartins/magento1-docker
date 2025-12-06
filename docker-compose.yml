@@ -1,0 +1,74 @@
+services:
+  nginx:
+    image: nginx:1.19-alpine
+    container_name: magento1_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./www:/var/www
+    depends_on:
+      - php-fpm
+    networks:
+      - magento1_network
+
+  php-fpm:
+    build:
+      context: ./php-fpm
+      dockerfile: Dockerfile
+    container_name: magento1_php-fpm
+    volumes:
+      - ./www:/var/www
+    environment:
+      # Defina o fuso horário para evitar avisos do PHP
+      - TZ=America/Sao_Paulo
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - magento1_network
+
+  mysql:
+    image: mysql:5.7
+    container_name: magento1_mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - magento1_network
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: magento1_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - magento1_network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: magento1_phpmyadmin
+    links:
+      - mysql
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "8080:80"
+    networks:
+      - magento1_network
+
+volumes:
+  mysql_data:
+
+networks:
+  magento1_network:
+    driver: bridge

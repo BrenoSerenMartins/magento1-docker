@@ -1,0 +1,8 @@
+
+www/*
+dev/*
+
+# Ignora apenas arquivos dentro de conf.d
+nginx/conf.d/*
+# Não ignora o arquivo de exemplo
+!nginx/conf.d/magento1.conf.example

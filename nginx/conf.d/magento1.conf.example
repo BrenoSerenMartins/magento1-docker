@@ -1,0 +1,60 @@
+server {
+    listen 80;
+    server_name {{PROJECT_NAME}};
+
+    root {{CONTAINER_WWW_PATH}};
+    access_log /var/log/nginx/access.log;
+
+    fastcgi_connect_timeout 10s;
+    fastcgi_read_timeout 3600s;
+    fastcgi_send_timeout 60s;
+    fastcgi_buffer_size   128k;
+    fastcgi_buffers   4 256k;
+    fastcgi_busy_buffers_size   256k;
+    fastcgi_keep_conn on;
+
+    location / {
+        index index.html index.php;
+        try_files $uri $uri/ @handler;
+        expires 30d;
+    }
+
+    location ^~ /app/                { deny all; }
+    location ^~ /includes/           { deny all; }
+    location ^~ /lib/                { deny all; }
+    location ^~ /media/downloadable/ { deny all; }
+    location ^~ /pkginfo/            { deny all; }
+    location ^~ /report/config.xml   { deny all; }
+    location ^~ /var/                { deny all; }
+
+    location /var/export/ {
+        auth_basic           "Restricted";
+        auth_basic_user_file htpasswd;
+        autoindex            on;
+    }
+
+    location  /. {
+        return 404;
+    }
+
+    location @handler {
+        rewrite / /index.php;
+    }
+
+    location ~ .php/ {
+        rewrite ^(.*.php)/ $1 last;
+    }
+
+    location ~ .php$ {
+        if (!-e $request_filename) {
+            rewrite / /index.php last;
+        }
+
+        expires        off;
+        fastcgi_pass   php-fpm:9000;
+        fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;
+        fastcgi_param MAGE_IS_DEVELOPER_MODE true;
+        fastcgi_param MAGE_MODE "developer";
+        include        fastcgi_params;
+    }
+}
