@@ -1,6 +1,7 @@
-
+GEMINI.md
 www/*
 dev/*
+.env
 
 # Ignora apenas arquivos dentro de conf.d
 nginx/conf.d/*
