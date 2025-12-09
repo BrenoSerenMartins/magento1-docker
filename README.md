@@ -54,17 +54,29 @@ docker compose up -d
 
 ### 4. Create a New Magento 1 Project
 
-Use the `create-magento1-project.sh` script to create a new project. The script will handle everything: creating the directory, the database, the Nginx configuration, and downloading Magento 1.
+Use the `create-magento1-project.sh` script to create a new project. This will set up a standard HTTP site.
 
 ```bash
 ./scripts/create-magento1-project.sh your-project.local
 ```
 
-The script will ask for your `sudo` password to add an entry to the `/etc/hosts` file, allowing you to access the project via the `http://your-project.local` domain.
+### 5. (Optional) Enable SSL for a Project
 
-After completion, access the URL in your browser to start the Magento installation process.
+If you want to enable HTTPS for an existing project, use the `enable-ssl.sh` script.
 
-### 5. Removing a Project
+```bash
+./scripts/enable-ssl.sh your-project.local
+```
+
+This script will automatically:
+1.  Generate the necessary SSL certificates.
+2.  Create the Nginx configuration for HTTPS.
+3.  Update the Magento database to use `https://` URLs.
+4.  Clear the cache and restart Nginx.
+
+**IMPORTANT:** After running the script, you must manually import the generated certificate (`nginx/certs/your-project.local.crt`) into your operating system's trust store for the browser to recognize it.
+
+### 6. Removing a Project
 
 To remove a project, use the `remove-magento1-project.sh` script. It will remove the project directory, the database, and the Nginx configuration.
 

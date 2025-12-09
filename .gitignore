@@ -1,9 +1,13 @@
 GEMINI.md
+.env
+.vscode
+
 www/*
 dev/*
-.env
 
-# Ignora apenas arquivos dentro de conf.d
+
+# nginx
 nginx/conf.d/*
+nginx/certs/*
 # Não ignora o arquivo de exemplo
 !nginx/conf.d/magento1.conf.example

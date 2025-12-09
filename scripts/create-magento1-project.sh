@@ -116,10 +116,152 @@ docker compose -f "${PROJECT_ROOT}/docker-compose.yml" exec -T mysql rm -f /tmp/
 rm -f "${MYSQL_CNF_FILE}"
 
 
+# --- SSL Configuration ---
+ENABLE_SSL="${ENABLE_SSL:-false}" # Default to false if not set
+
 echo -e "${YELLOW}Generating Nginx configuration at:${RESET} $NGINX_CONF_PATH"
-cp "${PROJECT_ROOT}/nginx/conf.d/magento1.conf.example" "$NGINX_CONF_PATH"
-sed -i "s/{{PROJECT_NAME}}/${PROJECT_NAME}/g" "$NGINX_CONF_PATH"
-sed -i "s|{{CONTAINER_WWW_PATH}}|${CONTAINER_WWW_PATH}|g" "$NGINX_CONF_PATH"
+
+if [ "$ENABLE_SSL" = "true" ]; then
+  # HTTPS Configuration
+  cat > "$NGINX_CONF_PATH" <<EOF
+server {
+    listen 80;
+    server_name ${PROJECT_NAME};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${PROJECT_NAME};
+
+    ssl_certificate /etc/nginx/ssl/${PROJECT_NAME}.pem;
+    ssl_certificate_key /etc/nginx/ssl/${PROJECT_NAME}-key.pem;
+    include /etc/nginx/conf.d/options-ssl-nginx.conf;
+
+    root ${CONTAINER_WWW_PATH};
+    access_log /var/log/nginx/access.log;
+
+    # ... (rest of the common nginx config)
+    fastcgi_connect_timeout 10s;
+    fastcgi_read_timeout 3600s;
+    fastcgi_send_timeout 60s;
+    fastcgi_buffer_size   128k;
+    fastcgi_buffers   4 256k;
+    fastcgi_busy_buffers_size   256k;
+    fastcgi_keep_conn on;
+
+    location / {
+        index index.html index.php;
+        try_files \$uri \$uri/ @handler;
+        expires 30d;
+    }
+
+    location ^~ /app/                { deny all; }
+    location ^~ /includes/           { deny all; }
+    location ^~ /lib/                { deny all; }
+    location ^~ /media/downloadable/ { deny all; }
+    location ^~ /pkginfo/            { deny all; }
+    location ^~ /report/config.xml   { deny all; }
+    location ^~ /var/                { deny all; }
+
+    location /var/export/ {
+        auth_basic           "Restricted";
+        auth_basic_user_file htpasswd;
+        autoindex            on;
+    }
+
+    location  /. {
+        return 404;
+    }
+
+    location @handler {
+        rewrite / /index.php;
+    }
+
+    location ~ .php/ {
+        rewrite ^(.*.php)/ \$1 last;
+    }
+
+    location ~ .php\$ {
+        if (!-e \$request_filename) {
+            rewrite / /index.php last;
+        }
+
+        expires        off;
+        fastcgi_pass   php-fpm:9000;
+        fastcgi_param  SCRIPT_FILENAME  \$document_root\$fastcgi_script_name;
+        fastcgi_param MAGE_IS_DEVELOPER_MODE true;
+        fastcgi_param MAGE_MODE "developer";
+        include        fastcgi_params;
+    }
+}
+EOF
+else
+  # HTTP-only Configuration
+  cat > "$NGINX_CONF_PATH" <<EOF
+server {
+    listen 80;
+    server_name ${PROJECT_NAME};
+
+    root ${CONTAINER_WWW_PATH};
+    access_log /var/log/nginx/access.log;
+
+    # ... (rest of the common nginx config)
+    fastcgi_connect_timeout 10s;
+    fastcgi_read_timeout 3600s;
+    fastcgi_send_timeout 60s;
+    fastcgi_buffer_size   128k;
+    fastcgi_buffers   4 256k;
+    fastcgi_busy_buffers_size   256k;
+    fastcgi_keep_conn on;
+
+    location / {
+        index index.html index.php;
+        try_files \$uri \$uri/ @handler;
+        expires 30d;
+    }
+
+    location ^~ /app/                { deny all; }
+    location ^~ /includes/           { deny all; }
+    location ^~ /lib/                { deny all; }
+    location ^~ /media/downloadable/ { deny all; }
+    location ^~ /pkginfo/            { deny all; }
+    location ^~ /report/config.xml   { deny all; }
+    location ^~ /var/                { deny all; }
+
+    location /var/export/ {
+        auth_basic           "Restricted";
+        auth_basic_user_file htpasswd;
+        autoindex            on;
+    }
+
+    location  /. {
+        return 404;
+    }
+
+    location @handler {
+        rewrite / /index.php;
+    }
+
+    location ~ .php/ {
+        rewrite ^(.*.php)/ \$1 last;
+    }
+
+    location ~ .php\$ {
+        if (!-e \$request_filename) {
+            rewrite / /index.php last;
+        }
+
+        expires        off;
+        fastcgi_pass   php-fpm:9000;
+        fastcgi_param  SCRIPT_FILENAME  \$document_root\$fastcgi_script_name;
+        fastcgi_param MAGE_IS_DEVELOPER_MODE true;
+        fastcgi_param MAGE_MODE "developer";
+        include        fastcgi_params;
+    }
+}
+EOF
+fi
 
 echo -e "${GREEN}✔ Nginx configuration created!${RESET}"
 
@@ -193,6 +335,17 @@ echo -e "${GREEN}✔ Base URL validation skipped!${RESET}"
 echo -e "${YELLOW}Removing temporary files...${RESET}"
 rm -rf /tmp/magento-mirror
 echo -e "${GREEN}✔ Temporary files removed!${RESET}"
+
+if [ "$ENABLE_SSL" = "true" ]; then
+  echo -e "\n${CYAN}============================================="
+  echo -e "${BOLD}Generating SSL Certificate...${RESET}"
+  echo -e "=============================================${RESET}"
+  bash "${PROJECT_ROOT}/scripts/generate-ssl-certs.sh" "${PROJECT_NAME}"
+  ACCESS_PROTOCOL="https"
+  echo -e "${YELLOW}Remember to run 'scripts/setup-ssl.sh' once on your host machine to trust the local CA for mkcert.${RESET}"
+else
+  ACCESS_PROTOCOL="http"
+fi
 
 echo -e "\n${CYAN}============================================="
 echo -e "${BOLD}Installation Ready!${RESET}"

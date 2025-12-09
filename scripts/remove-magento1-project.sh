@@ -77,6 +77,26 @@ else
   echo -e "${YELLOW}Nginx configuration not found.${RESET}"
 fi
 
+# --- Remove SSL certificates ---
+SSL_CERT_PATH="${PROJECT_ROOT}/nginx/ssl/${PROJECT_NAME}.pem"
+SSL_KEY_PATH="${PROJECT_ROOT}/nginx/ssl/${PROJECT_NAME}-key.pem"
+
+if [ -f "$SSL_CERT_PATH" ]; then
+  echo -e "${YELLOW}Removing SSL certificate: ${SSL_CERT_PATH}...${RESET}"
+  sudo rm -f "$SSL_CERT_PATH"
+  echo -e "${GREEN}✔ SSL certificate removed!${RESET}"
+else
+  echo -e "${YELLOW}SSL certificate not found.${RESET}"
+fi
+
+if [ -f "$SSL_KEY_PATH" ]; then
+  echo -e "${YELLOW}Removing SSL key: ${SSL_KEY_PATH}...${RESET}"
+  sudo rm -f "$SSL_KEY_PATH"
+  echo -e "${GREEN}✔ SSL key removed!${RESET}"
+else
+  echo -e "${YELLOW}SSL key not found.${RESET}"
+fi
+
 # --- Remove database ---
 DB_DATABASE="magento1_$(echo "$PROJECT_NAME" | sed 's/[.-]/_/g')"
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD}"
